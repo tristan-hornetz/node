@@ -447,9 +447,6 @@ Affects the default output directory of:
 
 > Stability: 1.1 - Active development
 
-<!-- YAML
-added: REPLACEME
--->
 
 Disable specific process warnings by `code` or `type`.
 

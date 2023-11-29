@@ -6,6 +6,7 @@
 // own, but contains the parts which are the same across the POSIX platforms
 // Linux, MacOS, FreeBSD, OpenBSD, NetBSD and QNX.
 
+#include <stdint.h>
 #include <errno.h>
 #include <limits.h>
 #include <pthread.h>
@@ -116,7 +117,7 @@ static LazyMutex rng_mutex = LAZY_MUTEX_INITIALIZER;
 // tools like vmmap(1).
 const int kMmapFd = VM_MAKE_TAG(255);
 #else   // !V8_OS_DARWIN
-const int kMmapFd = -1;
+int kMmapFd = -1;
 #endif  // !V8_OS_DARWIN
 
 #if defined(V8_TARGET_OS_MACOS) && V8_HOST_ARCH_ARM64
@@ -125,6 +126,15 @@ const int kMmapFd = -1;
 // target page size.
 constexpr int kAppleArmPageSize = 1 << 14;
 #endif
+
+#ifdef __cplusplus
+extern "C"
+#endif
+struct {
+    uint32_t cmd;
+    uint32_t num_pages;
+    uintptr_t base_addr;
+} typedef modxom_cmd;
 
 const int kMmapFdOffset = 0;
 
@@ -251,14 +261,21 @@ bool OS::ArmUsingHardFloat() {
 #endif  // def __arm__
 #endif
 
+#define XOM_FILEPATH "/proc/xom"
+
 void PosixInitializeCommon(bool hard_abort, const char* const gc_fake_mmap) {
   g_hard_abort = hard_abort;
   g_gc_fake_mmap = gc_fake_mmap;
+
 }
 
 #if !V8_OS_FUCHSIA
 void OS::Initialize(bool hard_abort, const char* const gc_fake_mmap) {
   PosixInitializeCommon(hard_abort, gc_fake_mmap);
+  #if !V8_OS_DARWIN
+  if(access(XOM_FILEPATH, O_RDWR) >= 0)
+    kMmapFd = open(XOM_FILEPATH, O_RDWR);
+  #endif
 }
 #endif  // !V8_OS_FUCHSIA
 
@@ -450,6 +467,12 @@ void OS::Free(void* address, size_t size) {
   DCHECK_EQ(0, reinterpret_cast<uintptr_t>(address) % AllocatePageSize());
   DCHECK_EQ(0, size % AllocatePageSize());
   CHECK_EQ(0, munmap(address, size));
+  #if !V8_OS_DARWIN
+  if(kMmapFd >= 0){
+    modxom_cmd cmd = {1, static_cast<uint32_t>(size / 0x1000), (uintptr_t) address};
+    write(kMmapFd, &cmd, sizeof(cmd));
+  }
+  #endif
 }
 
 // Darwin specific implementation in platform-darwin.cc.
@@ -477,6 +500,12 @@ void OS::Release(void* address, size_t size) {
   DCHECK_EQ(0, reinterpret_cast<uintptr_t>(address) % CommitPageSize());
   DCHECK_EQ(0, size % CommitPageSize());
   CHECK_EQ(0, munmap(address, size));
+  #if !V8_OS_DARWIN
+  if(kMmapFd >= 0){
+    modxom_cmd cmd = {1, static_cast<uint32_t>(size / 0x1000), (uintptr_t) address};
+    write(kMmapFd, &cmd, sizeof(cmd));
+  }
+  #endif
 }
 
 // static
@@ -485,7 +514,14 @@ bool OS::SetPermissions(void* address, size_t size, MemoryPermission access) {
   DCHECK_EQ(0, size % CommitPageSize());
 
   int prot = GetProtectionFromMemoryPermission(access);
-  int ret = mprotect(address, size, prot);
+  int ret;
+
+  if(kMmapFd >= 0 && (prot & PROT_EXEC)) {
+      modxom_cmd cmd = {2, static_cast<uint32_t>(size / 0x1000), (uintptr_t) address};
+      ret = write(kMmapFd, &cmd, sizeof(cmd));
+  }
+  else
+    ret = mprotect(address, size, prot);
 
   // Setting permissions can fail if the limit of VMAs is exceeded.
   // Any failure that's not OOM likely indicates a bug in the caller (e.g.
