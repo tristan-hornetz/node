@@ -972,7 +972,7 @@ The [`tls.SecurePair`][] class is deprecated. Please use
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version:
@@ -996,7 +996,7 @@ instead.
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version:
@@ -1020,7 +1020,7 @@ The [`util.isBoolean()`][] API is deprecated. Please use
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version:
@@ -1044,7 +1044,7 @@ The [`util.isBuffer()`][] API is deprecated. Please use
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version:
@@ -1068,7 +1068,7 @@ The [`util.isDate()`][] API is deprecated. Please use
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version:
@@ -1093,7 +1093,7 @@ instead.
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version:
@@ -1117,7 +1117,7 @@ The [`util.isFunction()`][] API is deprecated. Please use
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version:
@@ -1141,7 +1141,7 @@ The [`util.isNull()`][] API is deprecated. Please use
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version:
@@ -1165,7 +1165,7 @@ The [`util.isNullOrUndefined()`][] API is deprecated. Please use
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version:
@@ -1189,7 +1189,7 @@ The [`util.isNumber()`][] API is deprecated. Please use
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version:
@@ -1213,7 +1213,7 @@ The [`util.isObject()`][] API is deprecated. Please use
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version:
@@ -1238,7 +1238,7 @@ instead.
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version:
@@ -1262,7 +1262,7 @@ The [`util.isRegExp()`][] API is deprecated. Please use
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version:
@@ -1286,7 +1286,7 @@ The [`util.isString()`][] API is deprecated. Please use
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version:
@@ -1310,7 +1310,7 @@ The [`util.isSymbol()`][] API is deprecated. Please use
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version:
@@ -1334,7 +1334,7 @@ The [`util.isUndefined()`][] API is deprecated. Please use
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version: v6.12.0
@@ -1363,7 +1363,7 @@ requirements and complexity of your application.
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: REPLACEME
     pr-url: https://github.com/nodejs/node/pull/50488
     description: Runtime deprecation.
   - version: v6.12.0
@@ -1645,7 +1645,7 @@ Accessing several internal, undocumented properties of `net.Server` instances
 with inappropriate names is deprecated.
 
 As the original API was undocumented and not generally useful for non-internal
-code, no 99.0.0nt API is provided.
+code, no replacement API is provided.
 
 ### DEP0074: `REPLServer.bufferedCommand`
 
@@ -3518,7 +3518,7 @@ deprecated. Get them from `fs.constants` or `fs.promises.constants` instead.
 
 <!-- YAML
 changes:
-  - version: 99.0.0
+  - version: v21.3.0
     pr-url: https://github.com/nodejs/node/pull/50486
     description: A deprecation code has been assigned.
   - version: v14.0.0
@@ -3530,6 +3530,20 @@ Type: Documentation-only
 
 The [`util.types.isWebAssemblyCompiledModule`][] API is deprecated. Please use
 `value instanceof WebAssembly.Module` instead.
+
+### DEP0178: `dirent.path`
+
+<!-- YAML
+changes:
+  - version: REPLACEME
+    pr-url: https://github.com/nodejs/node/pull/51020
+    description: Documentation-only deprecation.
+-->
+
+Type: Documentation-only
+
+The [`dirent.path`][] is deprecated due to its lack of consistency across
+release lines. Please use [`dirent.parentPath`][] instead.
 
 [NIST SP 800-38D]: https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf
 [RFC 6066]: https://tools.ietf.org/html/rfc6066#section-3
@@ -3577,6 +3591,8 @@ The [`util.types.isWebAssemblyCompiledModule`][] API is deprecated. Please use
 [`decipher.setAuthTag()`]: crypto.md#deciphersetauthtagbuffer-encoding
 [`diagnostics_channel.subscribe(name, onMessage)`]: diagnostics_channel.md#diagnostics_channelsubscribename-onmessage
 [`diagnostics_channel.unsubscribe(name, onMessage)`]: diagnostics_channel.md#diagnostics_channelunsubscribename-onmessage
+[`dirent.parentPath`]: fs.md#direntparentpath
+[`dirent.path`]: fs.md#direntpath
 [`dns.lookup()`]: dns.md#dnslookuphostname-options-callback
 [`dnsPromises.lookup()`]: dns.md#dnspromiseslookuphostname-options
 [`domain`]: domain.md

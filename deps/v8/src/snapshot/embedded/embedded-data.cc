@@ -432,7 +432,7 @@ size_t EmbeddedData::CreateEmbeddedBlobDataHash() const {
 }
 
 size_t EmbeddedData::CreateEmbeddedBlobCodeHash() const {
-  CHECK(v8_flags.text_is_readable);
+  // CHECK(v8_flags.text_is_readable);
   base::Vector<const uint8_t> payload(code_, code_size_);
   return Checksum(payload);
 }

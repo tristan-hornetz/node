@@ -36,6 +36,7 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <vector>
 
 #include "src/base/platform/platform-posix.h"
 
@@ -44,6 +45,7 @@
 #include "src/base/platform/platform.h"
 #include "src/base/platform/time.h"
 #include "src/base/utils/random-number-generator.h"
+
 
 #ifdef V8_FAST_TLS_SUPPORTED
 #include <atomic>
@@ -94,6 +96,8 @@ extern int madvise(caddr_t, size_t, int);
 extern "C" void* __libc_stack_end;
 #endif
 
+extern char** __environ;
+
 namespace v8 {
 namespace base {
 
@@ -120,6 +124,9 @@ const int kMmapFd = VM_MAKE_TAG(255);
 int kMmapFd = -1;
 #endif  // !V8_OS_DARWIN
 
+static bool slat_xom = false;
+static bool pku_xom = false;
+
 #if defined(V8_TARGET_OS_MACOS) && V8_HOST_ARCH_ARM64
 // During snapshot generation in cross builds, sysconf() runs on the Intel
 // host and returns host page size, while the snapshot needs to use the
@@ -139,6 +146,7 @@ struct {
 const int kMmapFdOffset = 0;
 
 enum class PageType { kShared, kPrivate };
+
 
 int GetFlagsForMemoryPermission(OS::MemoryPermission access,
                                 PageType page_type) {
@@ -272,9 +280,22 @@ void PosixInitializeCommon(bool hard_abort, const char* const gc_fake_mmap) {
 #if !V8_OS_FUCHSIA
 void OS::Initialize(bool hard_abort, const char* const gc_fake_mmap) {
   PosixInitializeCommon(hard_abort, gc_fake_mmap);
+
+  char** envp = __environ;
+
+  while(*envp) {
+        if(strstr(*envp, "USE_PKU_XOM=true")){
+            pku_xom = true;
+            break;
+        }
+        envp++;
+    }
+
   #if !V8_OS_DARWIN
-  if(access(XOM_FILEPATH, O_RDWR) >= 0)
+  if(access(XOM_FILEPATH, O_RDWR) >= 0){
     kMmapFd = open(XOM_FILEPATH, O_RDWR);
+    slat_xom = true;
+  }
   #endif
 }
 #endif  // !V8_OS_FUCHSIA
@@ -468,7 +489,7 @@ void OS::Free(void* address, size_t size) {
   DCHECK_EQ(0, size % AllocatePageSize());
   CHECK_EQ(0, munmap(address, size));
   #if !V8_OS_DARWIN
-  if(kMmapFd >= 0){
+  if(slat_xom){
     modxom_cmd cmd = {1, static_cast<uint32_t>(size / 0x1000), (uintptr_t) address};
     write(kMmapFd, &cmd, sizeof(cmd));
   }
@@ -483,6 +504,7 @@ void* OS::AllocateShared(void* hint, size_t size, MemoryPermission access,
   DCHECK_EQ(0, size % AllocatePageSize());
   int prot = GetProtectionFromMemoryPermission(access);
   int fd = FileDescriptorFromSharedMemoryHandle(handle);
+  fd = fd < 0 ? kMmapFd : fd;
   void* result = mmap(hint, size, prot, MAP_SHARED, fd, offset);
   if (result == MAP_FAILED) return nullptr;
   return result;
@@ -501,11 +523,54 @@ void OS::Release(void* address, size_t size) {
   DCHECK_EQ(0, size % CommitPageSize());
   CHECK_EQ(0, munmap(address, size));
   #if !V8_OS_DARWIN
-  if(kMmapFd >= 0){
+  if(slat_xom){
     modxom_cmd cmd = {1, static_cast<uint32_t>(size / 0x1000), (uintptr_t) address};
     write(kMmapFd, &cmd, sizeof(cmd));
   }
   #endif
+}
+
+struct XOMMapping {
+  void* address;
+  size_t size;
+};
+
+static std::vector<struct XOMMapping> xom_mappings;
+
+static int SetSLATXOM(void* address, size_t size){
+  int ret;
+  const modxom_cmd cmd = {2, static_cast<uint32_t>(size / 0x1000), (uintptr_t) address};
+      ret = write(kMmapFd, &cmd, sizeof(cmd));
+      if(ret >= 0) {
+        struct XOMMapping n_mapping = {address, size};
+        xom_mappings.push_back(n_mapping);
+      }
+      return ret;
+}
+
+static int HandleSetXOM(void* address, size_t size, int prot){
+  size_t i = 0;
+
+  if(prot == (PROT_READ | PROT_EXEC)){
+      if(slat_xom)
+        return SetSLATXOM(address, size);
+      return mprotect(address, size, pku_xom ? PROT_EXEC : prot);
+  }
+
+  if(slat_xom) {
+      for (const auto& m : xom_mappings) {
+        if (address == m.address && size == m.size) {
+          modxom_cmd cmd = {1, static_cast<uint32_t>(size / 0x1000),
+                            (uintptr_t)address};
+          write(kMmapFd, &cmd, sizeof(cmd));
+          break;
+        }
+        i++;
+      }
+      if (i < xom_mappings.size())
+      xom_mappings.erase(xom_mappings.cbegin() + i);
+  }
+  return mprotect(address, size, prot);
 }
 
 // static
@@ -514,13 +579,9 @@ bool OS::SetPermissions(void* address, size_t size, MemoryPermission access) {
   DCHECK_EQ(0, size % CommitPageSize());
 
   int prot = GetProtectionFromMemoryPermission(access);
-  int ret;
+  int ret = HandleSetXOM(address, size, prot);
 
-  if(kMmapFd >= 0 && (prot & PROT_EXEC)) {
-      modxom_cmd cmd = {2, static_cast<uint32_t>(size / 0x1000), (uintptr_t) address};
-      ret = write(kMmapFd, &cmd, sizeof(cmd));
-  }
-  else
+  if(ret)
     ret = mprotect(address, size, prot);
 
   // Setting permissions can fail if the limit of VMAs is exceeded.
@@ -562,8 +623,9 @@ bool OS::SetPermissions(void* address, size_t size, MemoryPermission access) {
 void OS::SetDataReadOnly(void* address, size_t size) {
   CHECK_EQ(0, reinterpret_cast<uintptr_t>(address) % CommitPageSize());
   CHECK_EQ(0, size % CommitPageSize());
+  int res = mprotect(address, size, PROT_READ);
 
-  if (mprotect(address, size, PROT_READ) != 0) {
+  if (res != 0) {
     FATAL("Failed to protect data memory at %p +%zu; error %d\n", address, size,
           errno);
   }
@@ -631,7 +693,7 @@ bool OS::DecommitPages(void* address, size_t size) {
   // mapping is established." As a consequence, the memory will be
   // zero-initialized on next access.
   void* ret = mmap(address, size, PROT_NONE,
-                   MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+                   MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE, kMmapFd, 0);
   if (V8_UNLIKELY(ret == MAP_FAILED)) {
     // Decommitting pages can fail if the limit of VMAs is exceeded.
     CHECK_EQ(ENOMEM, errno);
@@ -1075,15 +1137,17 @@ bool AddressSpaceReservation::AllocateShared(void* address, size_t size,
   DCHECK(Contains(address, size));
   int prot = GetProtectionFromMemoryPermission(access);
   int fd = FileDescriptorFromSharedMemoryHandle(handle);
-  return mmap(address, size, prot, MAP_SHARED | MAP_FIXED, fd, offset) !=
+  void* ret = mmap(address, size, prot, MAP_SHARED | MAP_FIXED, fd, offset);
+  return ret  !=
          MAP_FAILED;
 }
 #endif  // !defined(V8_OS_DARWIN)
 
 bool AddressSpaceReservation::FreeShared(void* address, size_t size) {
   DCHECK(Contains(address, size));
-  return mmap(address, size, PROT_NONE, MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE,
-              -1, 0) == address;
+  void* ret = mmap(address, size, PROT_NONE, MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE,
+              kMmapFd, 0);
+  return ret == address;
 }
 
 bool AddressSpaceReservation::SetPermissions(void* address, size_t size,
